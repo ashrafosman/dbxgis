@@ -17,10 +17,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      # Lockfiles generated behind a private npm mirror can't be fetched from GitHub runners.
+      - name: Point lockfile at the public npm registry
+        run: sed -i -E 's#https://[^/"]*npm-proxy[^/"]*/#https://registry.npmjs.org/#g' bun.lock
       - run: bun install --frozen-lockfile
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
       - run: bun run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
