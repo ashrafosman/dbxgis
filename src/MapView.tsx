@@ -2,6 +2,11 @@ import { useEffect, useRef } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// MapLibre v6 looks for its worker next to its own module file, which bundling breaks.
+// Ship the worker as an asset and point MapLibre at it explicitly.
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+
+maplibregl.setWorkerUrl(workerUrl);
 import type { Geometry } from 'geojson';
 import { C, type Camera, type Output } from './scenes';
 
