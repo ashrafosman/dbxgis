@@ -1,0 +1,10 @@
+node_modules
+dist
+.remember
+.playwright-mcp
+*.tsbuildinfo
+.DS_Store
+# validation output from running against a workspace
+validation/sql/
+validation/results.json
+validation/run.err
