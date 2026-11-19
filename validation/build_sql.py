@@ -163,6 +163,17 @@ GROUP BY d.name ORDER BY cardiac_calls DESC;"""
 Q["16_bi_hex_centers"] = """SELECT cell, h3_centeraswkt(cell) AS center_wkt, h3_boundaryaswkt(cell) AS boundary_wkt
 FROM ems.gold.incidents_h3;"""
 
+Q["17_h3_fill"] = """WITH d AS (
+  SELECT ST_AsWKB(geom) AS wkb   -- H3 functions take WKB or WKT, not GEOMETRY
+  FROM ems.ref.districts WHERE name = 'Mile Square'),
+fill AS (SELECT explode(h3_polyfillash3(wkb, 8)) AS cell FROM d),
+tess AS (SELECT inline(h3_tessellateaswkb(wkb, 8)) FROM d)  -- cellid, core, chip
+SELECT 'h3_polyfillash3' AS fn, COUNT(*) AS cells, NULL AS core_cells
+FROM fill
+UNION ALL
+SELECT 'h3_tessellateaswkb', COUNT(*), COUNT_IF(core)
+FROM tess;"""
+
 for name, sql in Q.items():
     body = sql if name.startswith("00_") else wrap(sql)
     (OUT / f"{name}.sql").write_text(body + "\n")

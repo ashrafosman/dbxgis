@@ -1,5 +1,5 @@
 import * as turf from '@turf/turf';
-import { cellToBoundary, gridDisk, gridDistance, latLngToCell } from 'h3-js';
+import { POLYGON_TO_CELLS_FLAGS, cellToBoundary, gridDisk, gridDistance, latLngToCell, polygonToCells, polygonToCellsExperimental } from 'h3-js';
 import type { Feature, FeatureCollection, Geometry, LineString, Point, Polygon, MultiPolygon } from 'geojson';
 import { CENTER, clinics, county, districts, incidents, river } from './data';
 import { countVertices, ease, fc, feat, fmt, geohash, lerp, seg, shortWKT, toWKBHex, toWKT } from './geo';
@@ -894,6 +894,132 @@ const sKring: Scene = {
   },
 };
 
+// ---------------------------------------------------------------- polygon → H3
+const cellPolygon = (cell: string): Polygon => ({ type: 'Polygon', coordinates: [cellToBoundary(cell, true)] });
+const asDistrict = (key: string) => districts.find((d) => d.properties.key === key) ?? districts[0];
+
+const sFill: Scene = {
+  id: 'h3-fill',
+  group: 'Index with H3',
+  title: 'Fill polygons with H3 cells',
+  fns: ['h3_polyfillash3', 'h3_tessellateaswkb', 'ST_AsWKB'],
+  blurb:
+    'Two ways to turn a polygon into H3 cells. h3_polyfillash3 keeps every cell whose centre is inside, which is fast but leaves the edges ragged. h3_tessellateaswkb covers the polygon exactly: whole "core" cells inside, plus boundary cells clipped into chips. Click any district to fill it.',
+  params: [{ key: 'res', label: 'H3 resolution', min: 7, max: 9, step: 1, value: 8, unit: '' }],
+  interaction: 'select',
+  hint: 'Click a district to fill it',
+  camera: { center: turf.centroid(districts[0]).geometry.coordinates as [number, number], zoom: 11.35, pitch: 0, bearing: 0 },
+  duration: 8000,
+  sql: (p, ctx) => [
+    { text: 'WITH d AS (', stage: 0 },
+    { text: '  SELECT ST_AsWKB(geom) AS wkb   -- H3 functions take WKB or WKT, not GEOMETRY', stage: 0 },
+    { text: `  FROM ems.ref.districts WHERE name = '${asDistrict(ctx.selected).properties.name}'),`, stage: 0 },
+    { text: `fill AS (SELECT explode(h3_polyfillash3(wkb, ${p.res})) AS cell FROM d),`, stage: 1 },
+    { text: `tess AS (SELECT inline(h3_tessellateaswkb(wkb, ${p.res})) FROM d)  -- cellid, core, chip`, stage: 3 },
+    { text: "SELECT 'h3_polyfillash3' AS fn, COUNT(*) AS cells, NULL AS core_cells", stage: 1 },
+    { text: 'FROM fill', stage: 1 },
+    { text: 'UNION ALL', stage: 3 },
+    { text: "SELECT 'h3_tessellateaswkb', COUNT(*), COUNT_IF(core)", stage: 3 },
+    { text: 'FROM tess;', stage: 3 },
+  ],
+  build: (p, ctx) => {
+    const dist = asDistrict(ctx.selected);
+    const polys = dist.geometry.type === 'Polygon' ? [dist.geometry.coordinates] : dist.geometry.coordinates;
+    const center = turf.centroid(dist).geometry.coordinates;
+    const distTo = (c: string) => turf.distance(center, turf.centroid(cellPolygon(c)).geometry.coordinates);
+
+    // h3_polyfillash3 = centre containment; h3_tessellateaswkb = every overlapping cell, clipped
+    const fillSet = new Set(polys.flatMap((poly) => polygonToCells(poly, p.res, true)));
+    const overlap = [...new Set(polys.flatMap((poly) => polygonToCellsExperimental(poly, p.res, POLYGON_TO_CELLS_FLAGS.containmentOverlapping, true)))];
+    const tess = overlap
+      .map((cell) => {
+        const poly = cellPolygon(cell);
+        const chip = turf.intersect(turf.featureCollection([feat(poly) as Feature<Polygon>, dist as Feature<Polygon | MultiPolygon>]));
+        if (!chip) return null;
+        const cellA = turf.area(poly);
+        const chipA = turf.area(chip);
+        return { cell, poly, chip: chip.geometry, cellA, chipA, core: chipA / cellA > 0.9999, d: distTo(cell) };
+      })
+      .filter(Boolean) as { cell: string; poly: Polygon; chip: Polygon | MultiPolygon; cellA: number; chipA: number; core: boolean; d: number }[];
+    const byCell = new Map(tess.map((x) => [x.cell, x]));
+    const fill = [...fillSet].map((cell) => ({ cell, poly: cellPolygon(cell), d: distTo(cell), info: byCell.get(cell) }));
+    const overhang = fill
+      .filter((x) => x.info && !x.info.core)
+      .map((x) => turf.difference(turf.featureCollection([feat(x.poly) as Feature<Polygon>, dist as Feature<Polygon | MultiPolygon>])))
+      .filter(Boolean) as Feature<Polygon | MultiPolygon>[];
+    const missed = tess.filter((x) => !fillSet.has(x.cell));
+    const areaPoly = km2(dist);
+    const fillKm2 = fill.reduce((s, x) => s + turf.area(x.poly), 0) / 1e6;
+    const overKm2 = overhang.reduce((s, x) => s + turf.area(x), 0) / 1e6;
+    const missKm2 = missed.reduce((s, x) => s + x.chipA, 0) / 1e6;
+    const tessKm2 = tess.reduce((s, x) => s + x.chipA, 0) / 1e6;
+    const core = tess.filter((x) => x.core).length;
+    const maxD = Math.max(...tess.map((x) => x.d), 0.001);
+    const name = dist.properties.name;
+
+    return {
+      stages: [
+        { at: 0, caption: `${name}: ${fmt(areaPoly, 1)} km² polygon` },
+        { at: 0.1, caption: `h3_polyfillash3 keeps the ${fill.length} cells whose centres fall inside` },
+        { at: 0.42, caption: `Ragged edges: ${fmt(overKm2, 2)} km² hangs outside (red), ${fmt(missKm2, 2)} km² is missed (dark)` },
+        { at: 0.52, caption: `h3_tessellateaswkb: ${core} whole core cells plus ${tess.length - core} boundary chips` },
+        { at: 0.9, caption: `${tess.length} cells cover the polygon exactly, chips clipped to the boundary` },
+      ],
+      layers: [
+        { id: 'd-hit', source: 'dall', type: 'fill', paint: { 'fill-color': C.teal, 'fill-opacity': 0.03 } },
+        { id: 'd-all', source: 'dall', type: 'line', paint: { 'line-color': C.ink, 'line-width': 1, 'line-opacity': 0.25 } },
+        { id: 'fill-f', source: 'fill', type: 'fill', paint: { 'fill-color': C.tealLight, 'fill-opacity': ['get', 'o'] } },
+        { id: 'fill-l', source: 'fill', type: 'line', paint: { 'line-color': '#fff', 'line-width': 1.2, 'line-opacity': ['get', 'o'] } },
+        { id: 'over', source: 'over', type: 'fill', paint: { 'fill-color': C.red, 'fill-opacity': ['get', 'o'] } },
+        { id: 'miss', source: 'miss', type: 'fill', paint: { 'fill-color': C.ink, 'fill-opacity': ['get', 'o'] } },
+        {
+          id: 'tess-f',
+          source: 'tess',
+          type: 'fill',
+          paint: { 'fill-color': ['case', ['get', 'core'], C.teal, C.amber], 'fill-opacity': ['*', 0.7, ['get', 'o']] },
+        },
+        { id: 'tess-l', source: 'tess', type: 'line', paint: { 'line-color': '#fff', 'line-width': 1.2, 'line-opacity': ['get', 'o'] } },
+        { id: 'outline', source: 'outline', type: 'line', paint: { 'line-color': C.ink, 'line-width': 3 } },
+      ],
+      frame: (t) => {
+        const fillOut = 1 - seg(t, 0.52, 0.6);
+        const edge = seg(t, 0.42, 0.48) * (1 - seg(t, 0.52, 0.58));
+        return {
+          dall: fc(districts.map((d) => feat(d.geometry, { key: d.properties.key }))),
+          outline: fc(t > 0 ? [turf.polygonToLine(dist) as Feature] : []),
+          fill: fc(
+            fill
+              .map((x) => ({ x, o: ease(seg(t, 0.1 + (x.d / maxD) * 0.25, 0.16 + (x.d / maxD) * 0.25)) * 0.85 * fillOut }))
+              .filter(({ o }) => o > 0)
+              .map(({ x, o }) => feat(x.poly, { o })),
+          ),
+          over: fc(edge > 0 ? overhang.map((g) => feat(g.geometry, { o: 0.85 * edge })) : []),
+          miss: fc(edge > 0 ? missed.map((x) => feat(x.chip, { o: 0.7 * edge })) : []),
+          tess: fc(
+            tess
+              .map((x) => ({ x, o: ease(seg(t, 0.55 + (x.d / maxD) * 0.3, 0.6 + (x.d / maxD) * 0.3)) }))
+              .filter(({ o }) => o > 0)
+              .map(({ x, o }) => feat(x.chip, { core: x.core, o })),
+          ),
+        };
+      },
+      columns: ['function', 'cells', 'covered_km2', 'overhang_km2', 'missed_km2'],
+      rows: (t) => [
+        ...(t >= 0.42
+          ? [{ key: 'row-fill', geom: dist.geometry, cells: { function: 'h3_polyfillash3', cells: fill.length, covered_km2: fmt(fillKm2, 2), overhang_km2: fmt(overKm2, 2), missed_km2: fmt(missKm2, 2) } }]
+          : []),
+        ...(t >= 0.9
+          ? [{ key: 'row-tess', geom: dist.geometry, cells: { function: 'h3_tessellateaswkb', cells: tess.length, covered_km2: fmt(tessKm2, 2), overhang_km2: '0', missed_km2: '0' } }]
+          : []),
+      ],
+      stats: (t) => [
+        { label: 'Polygon', value: `${fmt(areaPoly, 2)} km²` },
+        ...(t >= 0.52 ? [{ label: 'Core cells', value: `${core}` }, { label: 'Boundary chips', value: `${tess.length - core}` }] : []),
+      ],
+    };
+  },
+};
+
 // ---------------------------------------------------------------- interop
 const nameOf = (key: string) =>
   ([...districts, ...clinics] as Feature[]).find((f) => (f.properties as { key: string }).key === key)?.properties?.name ?? key;
@@ -1005,7 +1131,7 @@ const sEcosystem: Scene = {
   }),
 };
 
-export const SCENES: Scene[] = [sPoint, sPolygons, sBuffer, sJoin, sNearest, sWithin, sOverlay, sSimplify, sH3, sKring, sFormats, sEcosystem];
+export const SCENES: Scene[] = [sPoint, sPolygons, sBuffer, sJoin, sNearest, sWithin, sOverlay, sSimplify, sH3, sKring, sFill, sFormats, sEcosystem];
 export const GROUPS = [...new Set(SCENES.map((s) => s.group))];
 
 export const DEFAULT_PROBE: [number, number] = [-86.158, 39.772];

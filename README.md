@@ -34,8 +34,9 @@ bun run build      # static bundle in dist/
 | 8 | Simplify detailed shapes | `ST_Simplify`, `ST_NPoints` |
 | 9 | Aggregate into H3 hexagons | `h3_longlatash3string`, `h3_boundaryaswkt` (3D, resolution slider) |
 | 10 | Expand rings of neighbours | `h3_kring`, `h3_distance` (click to pick centre) |
-| 11 | Speak every GIS format | `ST_AsText`, `ST_AsGeoJSON`, `ST_AsWKB`, `ST_AsEWKT`, `ST_GeoHash` |
-| 12 | Plug into the GIS stack | Ingest (GeoJSON, Shapefile, GeoParquet, Esri, PostGIS, streams) → serve (ArcGIS, QGIS, GeoPandas, Kepler/deck.gl, Power BI/Tableau, AI/BI + Genie) |
+| 11 | Fill polygons with H3 cells | `h3_polyfillash3` vs `h3_tessellateaswkb` (core cells + clipped chips; click a district) |
+| 12 | Speak every GIS format | `ST_AsText`, `ST_AsGeoJSON`, `ST_AsWKB`, `ST_AsEWKT`, `ST_GeoHash` |
+| 13 | Plug into the GIS stack | Ingest (GeoJSON, Shapefile, GeoParquet, Esri, PostGIS, streams) → serve (ArcGIS, QGIS, GeoPandas, Kepler/deck.gl, Power BI/Tableau, AI/BI + Genie) |
 
 ## Presenter controls
 
@@ -58,4 +59,4 @@ python3 validation/build_sql.py                 # writes validation/sql/*.sql
 ./validation/run.sh <profile> <warehouse_id>    # prints SUCCEEDED / error per query
 ```
 
-Last run: all 18 queries succeeded (Azure workspace, serverless SQL warehouse, 2026-11-17).
+Last run: all 19 queries succeeded (Azure workspace, serverless SQL warehouse, 2026-11-17).
