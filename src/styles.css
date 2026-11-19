@@ -352,3 +352,7 @@ tbody tr[tabindex='0'] { cursor: copy; }
   .packet { display: none; }
   .sql-line { transition: none; }
 }
+
+/* promo capture: hide on-map chrome so the compositor can frame the map cleanly */
+.capture .transport, .capture .basemaps, .capture .maplibregl-ctrl-top-right, .capture .hint { display: none !important; }
+

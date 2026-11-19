@@ -5,7 +5,9 @@ import { SqlPanel } from './Sql';
 import { ResultTable } from './ResultTable';
 import { Ecosystem } from './Ecosystem';
 
-const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// ?capture: frame-accurate control for the promo-video footage script (promo/capture.mjs).
+const captureMode = typeof window !== 'undefined' && new URLSearchParams(location.search).has('capture');
+const reducedMotion = captureMode || (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const initialParams = () => Object.fromEntries(SCENES.map((s) => [s.id, Object.fromEntries(s.params.map((p) => [p.key, p.value]))]));
 
 export default function App() {
@@ -67,6 +69,21 @@ export default function App() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [playing, scene.duration, speed]);
+
+  // capture hooks (no-op unless ?capture)
+  useEffect(() => {
+    if (!captureMode) return;
+    document.documentElement.classList.add('capture');
+    (window as unknown as { __demo: unknown }).__demo = {
+      scenes: SCENES.map((s) => s.id),
+      setScene: (id: string) => setIdx(SCENES.findIndex((s) => s.id === id)),
+      setT: (v: number) => {
+        setPlaying(false);
+        setT(v);
+      },
+      setBasemap,
+    };
+  }, []);
 
   // keyboard navigation
   useEffect(() => {
@@ -189,7 +206,7 @@ export default function App() {
 
         {output.custom === 'ecosystem' && <Ecosystem />}
 
-        {output.custom !== 'ecosystem' && (
+        {!output.custom && (
           <>
             <div className="basemaps" role="radiogroup" aria-label="Basemap">
               {BASEMAPS.map((b) => (

@@ -102,6 +102,21 @@ export function MapView({ sceneId, output, t, camera, basemap, highlight, onHove
       maxPitch: 70,
     });
     map.current = m;
+    if (new URLSearchParams(location.search).has('capture')) {
+      // Resolves once the map has finished drawing everything pending (used by promo/capture.mjs).
+      (window as unknown as { __mapIdle: () => Promise<void> }).__mapIdle = () =>
+        new Promise((resolve) => {
+          const done = () => resolve();
+          if (ready.current && m.loaded() && !m.isMoving()) {
+            m.once('idle', done);
+            m.triggerRepaint();
+            setTimeout(done, 1500);
+          } else {
+            m.once('idle', done);
+            setTimeout(done, 8000);
+          }
+        });
+    }
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
     m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'top-right');
     m.on('style.load', () => {

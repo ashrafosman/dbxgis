@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>dbxgis promo compositor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=block"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./comp.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <svg id="bg" width="1080" height="1920" aria-hidden="true">
+        <defs>
+          <pattern id="hex" width="84" height="145.5" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
+            <path d="M42 0 84 24.25v48.5L42 97 0 72.75v-48.5zM42 97v48.5M0 145.5l42-24.25 42 24.25" fill="none" stroke="#2A4A55" stroke-width="1.4" />
+          </pattern>
+          <radialGradient id="vig" cx="50%" cy="45%" r="75%">
+            <stop offset="0%" stop-color="#0F1D22" stop-opacity="0" />
+            <stop offset="100%" stop-color="#081115" stop-opacity="0.95" />
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="1920" fill="#0F1D22" />
+        <rect id="hexgrid" width="1080" height="1920" fill="url(#hex)" />
+        <rect width="1080" height="1920" fill="url(#vig)" />
+      </svg>
+      <div id="content"></div>
+      <div id="flash"></div>
+    </div>
+    <script type="module" src="./comp.js"></script>
+  </body>
+</html>

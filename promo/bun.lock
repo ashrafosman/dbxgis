@@ -1,0 +1,17 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "dbxgis-promo",
+      "devDependencies": {
+        "playwright": "^1.65.0-beta-1794421487000",
+      },
+    },
+  },
+  "packages": {
+    "playwright": ["playwright@1.65.0-beta-1794421487000", "https://registry.npmjs.org/playwright/-/playwright-1.65.0-beta-1794421487000.tgz", { "dependencies": { "playwright-core": "1.65.0-beta-1794421487000" }, "bin": { "playwright": "cli.js" } }, "sha512-NNQTJDoi6nbz8XXOVyoSPx2YGo3Fmzl91edliazl8P5+7DdBlKeddWUfPVIPX1wJdg92rMpn6Xo8YgpbQnVogA=="],
+
+    "playwright-core": ["playwright-core@1.65.0-beta-1794421487000", "https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.0-beta-1794421487000.tgz", { "bin": { "playwright-core": "cli.js" } }, "sha512-4O1IoXgDlnccgMuC039vHVjjk0L9ltq/lqgYyVMcdFBvtxalKlWtUzxBBSq2dCzBQCk5JJPIheDGdpsxkjq87w=="],
+  }
+}

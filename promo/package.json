@@ -1,0 +1,13 @@
+{
+  "name": "dbxgis-promo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "audio": "python3 audio.py",
+    "render": "node render.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0-beta-1794421487000"
+  }
+}

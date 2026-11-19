@@ -8,3 +8,7 @@ dist
 validation/sql/
 validation/results.json
 validation/run.err
+# promo video: regenerable assets and renders
+promo/node_modules
+promo/assets
+promo/out

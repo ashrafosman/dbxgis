@@ -1,0 +1,154 @@
+{
+  "fps": 30,
+  "bpm": 128,
+  "beats": 56,
+  "tailBeats": 2,
+  "voice": "Jamie (Premium)",
+  "vo": [
+    {
+      "beat": 0,
+      "text": "Every row of your data has a place."
+    },
+    {
+      "beat": 4,
+      "text": "Points. Polygons. H 3."
+    },
+    {
+      "beat": 8,
+      "text": "But can your sequel do geography?"
+    },
+    {
+      "beat": 12,
+      "text": "Now it can."
+    },
+    {
+      "beat": 16,
+      "text": "Buffer it."
+    },
+    {
+      "beat": 20,
+      "text": "Join it."
+    },
+    {
+      "beat": 24,
+      "text": "Route it."
+    },
+    {
+      "beat": 28,
+      "text": "Hex it."
+    },
+    {
+      "beat": 32,
+      "text": "Overlay it."
+    },
+    {
+      "beat": 36,
+      "text": "On any basemap."
+    },
+    {
+      "beat": 40,
+      "text": "Ship it to ArcGIS and Power BI."
+    },
+    {
+      "beat": 44,
+      "text": "Tested on a real warehouse."
+    },
+    {
+      "beat": 48,
+      "text": "Spatial sequel on Databricks. Try the free, interactive guide."
+    }
+  ],
+  "clips": [
+    {
+      "id": "buffer",
+      "scene": "st-buffer",
+      "beat": 16,
+      "verb": "BUFFER IT.",
+      "fns": "ST_Buffer \u00b7 ST_Contains",
+      "t": [
+        0.0,
+        1.0
+      ],
+      "focus": [
+        560,
+        470
+      ]
+    },
+    {
+      "id": "join",
+      "scene": "st-contains",
+      "beat": 20,
+      "verb": "JOIN IT.",
+      "fns": "ST_Contains \u00b7 GROUP BY",
+      "t": [
+        0.04,
+        0.95
+      ],
+      "focus": [
+        600,
+        470
+      ]
+    },
+    {
+      "id": "nearest",
+      "scene": "st-distance",
+      "beat": 24,
+      "verb": "ROUTE IT.",
+      "fns": "ST_DistanceSphere \u00b7 QUALIFY",
+      "t": [
+        0.08,
+        1.0
+      ],
+      "focus": [
+        590,
+        470
+      ]
+    },
+    {
+      "id": "h3",
+      "scene": "h3-agg",
+      "beat": 28,
+      "verb": "HEX IT.",
+      "fns": "h3_longlatash3string",
+      "t": [
+        0.1,
+        1.0
+      ],
+      "focus": [
+        600,
+        440
+      ]
+    },
+    {
+      "id": "overlay",
+      "scene": "st-intersection",
+      "beat": 32,
+      "verb": "OVERLAY IT.",
+      "fns": "ST_Buffer \u00b7 ST_Intersection",
+      "t": [
+        0.0,
+        1.0
+      ],
+      "focus": [
+        560,
+        470
+      ]
+    }
+  ],
+  "basemaps": {
+    "beat": 36,
+    "scene": "h3-agg",
+    "order": [
+      "positron",
+      "dark",
+      "esri",
+      "voyager"
+    ],
+    "labels": [
+      "CARTO Light",
+      "CARTO Dark",
+      "Esri World Imagery",
+      "CARTO Streets"
+    ]
+  }
+}
