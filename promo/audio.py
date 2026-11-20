@@ -12,6 +12,8 @@ TL = json.loads((HERE / "timeline.json").read_text())
 OUT = HERE / "assets" / "audio"
 OUT.mkdir(parents=True, exist_ok=True)
 
+SEC = TL.get("sections", {"end": 48})
+END = SEC["end"]                    # beat where the end card starts
 SR = 48000
 BPM = TL["bpm"]
 SPB = 60 / BPM                      # seconds per beat
@@ -159,7 +161,7 @@ place(pad(PROG[0][1], 4), 8, 0.8)
 
 # DROP and full groove
 place(impact(1.4), 12, 1.1)
-for b in range(12, 48):
+for b in range(12, END):
     kick_at(b)
     if b % 2 == 1:
         place(clap(), b, 0.9)
@@ -173,31 +175,70 @@ for b in range(12, 48):
         place_pumped(stab([f * 2 for f in chord], 0.25, 3400), b + 1.25, 0.7, -0.2)
 
 # whoosh into every clip cut
-for b in [16, 20, 24, 28, 32, 36, 40, 44, 48]:
+for b in sorted({c["beat"] for c in TL["clips"]} | {v for v in SEC.values()}):
     w = whoosh()
     place(w, b - len(w) / SR / SPB, 0.9)
 
 # outro: end-card hit, pad, a few soft kicks
-place(impact(1.2), 48, 0.9)
-place(pad(PROG[0][1], 8), 48, 1.1)
-for b in (48, 49, 50, 51):
+place(impact(1.2), END, 0.9)
+place(pad(PROG[0][1], 8), END, 1.1)
+for b in range(END, END + 4):
     kick_at(b, 0.8)
 
 pumpL, pumpR = music_pump
 L += pumpL * duck; R += pumpR * duck
 
 # ------------------------------------------------------------------ voiceover
-def tts(text, rate):
-    with tempfile.TemporaryDirectory() as d:
-        aiff = pathlib.Path(d) / "v.aiff"
-        subprocess.run(["say", "-v", TL["voice"], "-r", str(rate), "-o", str(aiff), text], check=True)
-        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(aiff), "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
-                             check=True, capture_output=True).stdout
+VOICE = TL["voice"] if isinstance(TL["voice"], dict) else {"provider": "say", "name": TL["voice"]}
+CACHE = OUT / "vo_cache"
+CACHE.mkdir(exist_ok=True)
+
+def decode(path):
+    raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(path), "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
+                         check=True, capture_output=True).stdout
     return np.frombuffer(raw, np.int16).astype(float) / 32768
 
-def trim(x, thresh=0.01):
+def elevenlabs(text, prev_text, next_text):
+    """One ElevenLabs request per line, cached on disk so re-renders cost no quota.
+    The API key is read from the ELEVENLABS_API_KEY environment variable and never printed."""
+    import hashlib, os, urllib.request
+    body = {"text": text, "model_id": VOICE["model_id"], "voice_settings": VOICE["settings"],
+            "previous_text": prev_text or None, "next_text": next_text or None}
+    key = hashlib.sha256(json.dumps([VOICE["voice_id"], body], sort_keys=True).encode()).hexdigest()[:16]
+    path = CACHE / f"{key}.mp3"
+    if not path.exists():
+        api_key = os.environ.get("ELEVENLABS_API_KEY")
+        if not api_key:
+            raise SystemExit("Set ELEVENLABS_API_KEY to generate new voice lines (cached lines need no key).")
+        req = urllib.request.Request(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE['voice_id']}?output_format=mp3_44100_128",
+            data=json.dumps(body).encode(), method="POST",
+            headers={"xi-api-key": api_key, "Content-Type": "application/json", "Accept": "audio/mpeg"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            path.write_bytes(r.read())
+        print(f"   generated {len(text)} chars → {path.name}")
+    return path
+
+def say(text, rate=205):
+    with tempfile.TemporaryDirectory() as d:
+        aiff = pathlib.Path(d) / "v.aiff"
+        subprocess.run(["say", "-v", VOICE["name"], "-r", str(rate), "-o", str(aiff), text], check=True)
+        return decode(aiff)
+
+def trim(x, thresh=0.012):
     idx = np.where(np.abs(x) > thresh)[0]
-    return x[idx[0]: idx[-1] + int(0.05 * SR)] if len(idx) else x
+    return x[max(0, idx[0] - int(0.01 * SR)): idx[-1] + int(0.06 * SR)] if len(idx) else x
+
+def tempo(x, factor):
+    """Speed a line up without changing pitch (ffmpeg atempo)."""
+    with tempfile.TemporaryDirectory() as d:
+        src = pathlib.Path(d) / "in.wav"
+        with wave.open(str(src), "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
+            w.writeframes((np.clip(x, -1, 1) * 32767).astype(np.int16).tobytes())
+        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(src), "-filter:a", f"atempo={factor:.3f}",
+                              "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"], check=True, capture_output=True).stdout
+    return np.frombuffer(raw, np.int16).astype(float) / 32768
 
 voice = np.zeros(N)
 vo = TL["vo"]
@@ -205,18 +246,23 @@ timings = []
 for k, line in enumerate(vo):
     nxt = vo[k + 1]["beat"] if k + 1 < len(vo) else TOTAL_BEATS
     slot = (nxt - line["beat"]) * SPB * 0.97
-    rate = 205
-    x = trim(tts(line["text"], rate))
-    while len(x) / SR > slot and rate < 250:
-        rate = min(250, int(rate * min(1.15, (len(x) / SR) / slot + 0.02)))
-        x = trim(tts(line["text"], rate))
-    x = highpass(x, 110)
-    x = np.tanh(x / (np.max(np.abs(x)) + 1e-9) * 1.8) * 0.8   # gentle saturation / level
-    start = line["beat"] + 0.04 / SPB
+    if VOICE["provider"] == "elevenlabs":
+        prev_t = vo[k - 1]["text"] if k else ""
+        next_t = vo[k + 1]["text"] if k + 1 < len(vo) else ""
+        x = trim(decode(elevenlabs(line["text"], prev_t, next_t)))
+    else:
+        x = trim(say(line["text"]))
+    speed = 1.0
+    if len(x) / SR > slot:
+        speed = min(1.3, (len(x) / SR) / slot)
+        x = trim(tempo(x, speed))
+    x = highpass(x, 90)
+    x = np.tanh(x / (np.max(np.abs(x)) + 1e-9) * 1.4) / np.tanh(1.4) * 0.85   # light compression / level
+    start = line["beat"] + 0.03 / SPB
     i = at(start); j = min(N, i + len(x))
     voice[i:j] += x[: j - i]
-    timings.append({"beat": line["beat"], "text": line["text"], "rate": rate, "seconds": round(len(x) / SR, 2)})
-    print(f"VO b{line['beat']:>2} rate {rate:>3}  {len(x)/SR:4.2f}s / slot {slot:4.2f}s  {line['text']}")
+    timings.append({"beat": line["beat"], "text": line["text"], "speed": round(speed, 3), "seconds": round(len(x) / SR, 2)})
+    print(f"VO b{line['beat']:>2} x{speed:4.2f}  {len(x)/SR:4.2f}s / slot {slot:4.2f}s  {line['text']}")
 
 # duck music under voice
 vo_env = lowpass((np.abs(voice) > 0.02).astype(float), 6)

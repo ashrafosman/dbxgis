@@ -40,7 +40,7 @@ const stage = page.locator('#stage');
 if (stills) {
   const dir = path.join(OUT, 'stills');
   fs.mkdirSync(dir, { recursive: true });
-  const beats = [0.3, 2.4, 5.3, 10.6, 12.3, 15.7, 17.5, 19.2, 29.4, 33.6, 37.3, 42.3, 47.5, 53];
+  const beats = process.argv.includes('--beats') ? process.argv[process.argv.indexOf('--beats') + 1].split(',').map(Number) : [0.3, 2.4, 5.3, 10.6, 12.3, 15.7, 17.5, 19.2, 29.4, 33.6, 37.3, 38.6, 41.3, 46.3, 51.5, 57];
   for (const b of beats) {
     const f = Math.round(b * fpb);
     await page.evaluate((n) => window.renderFrame(n), f);

@@ -1,9 +1,20 @@
 {
   "fps": 30,
   "bpm": 128,
-  "beats": 56,
+  "beats": 60,
   "tailBeats": 2,
-  "voice": "Jamie (Premium)",
+  "voice": {
+    "provider": "elevenlabs",
+    "voice_id": "TX3LPaxmHKxFdv7VOQHJ",
+    "name": "Liam",
+    "model_id": "eleven_multilingual_v2",
+    "settings": {
+      "stability": 0.38,
+      "similarity_boost": 0.8,
+      "style": 0.5,
+      "use_speaker_boost": true
+    }
+  },
   "vo": [
     {
       "beat": 0,
@@ -11,11 +22,11 @@
     },
     {
       "beat": 4,
-      "text": "Points. Polygons. H 3."
+      "text": "Points, polygons, H3."
     },
     {
       "beat": 8,
-      "text": "But can your sequel do geography?"
+      "text": "Can your SQL do geography?"
     },
     {
       "beat": 12,
@@ -43,19 +54,23 @@
     },
     {
       "beat": 36,
-      "text": "On any basemap."
+      "text": "Fill it."
     },
     {
       "beat": 40,
-      "text": "Ship it to ArcGIS and Power BI."
+      "text": "On any basemap."
     },
     {
       "beat": 44,
-      "text": "Tested on a real warehouse."
+      "text": "Ship it to ArcGIS and Power BI."
     },
     {
       "beat": 48,
-      "text": "Spatial sequel on Databricks. Try the free, interactive guide."
+      "text": "Tested on a real warehouse."
+    },
+    {
+      "beat": 52,
+      "text": "Spatial SQL on Databricks. Try the free, interactive guide."
     }
   ],
   "clips": [
@@ -133,10 +148,25 @@
         560,
         470
       ]
+    },
+    {
+      "id": "fill",
+      "scene": "h3-fill",
+      "beat": 36,
+      "verb": "FILL IT.",
+      "fns": "h3_polyfillash3 \u00b7 h3_tessellateaswkb",
+      "t": [
+        0.08,
+        0.97
+      ],
+      "focus": [
+        576,
+        450
+      ]
     }
   ],
   "basemaps": {
-    "beat": 36,
+    "beat": 40,
     "scene": "h3-agg",
     "order": [
       "positron",
@@ -150,5 +180,11 @@
       "Esri World Imagery",
       "CARTO Streets"
     ]
+  },
+  "sections": {
+    "basemaps": 40,
+    "ecosystem": 44,
+    "verify": 48,
+    "end": 52
   }
 }

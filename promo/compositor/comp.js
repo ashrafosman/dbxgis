@@ -8,6 +8,7 @@ export const TOTAL_FRAMES = Math.ceil((TL.beats + TL.tailBeats) * FPB);
 
 const META = {};
 for (const c of TL.clips) META[c.id] = await (await fetch(`${ROOT}/assets/clips/${c.id}/meta.json`)).json();
+const SEC = TL.sections; // section start beats: basemaps, ecosystem, verify, end
 const BM_META = await (await fetch(`${ROOT}/assets/clips/basemaps/meta.json`)).json();
 
 const $content = document.getElementById('content');
@@ -45,9 +46,9 @@ function bigText(text, { y, size, cls = 'white', st, extra = '', spacing = 0 }) 
 }
 
 // ---------------------------------------------------------------- global FX schedule
-const FLASH = [[0, 0.7], [2, 0.9], [12, 1], [14, 0.35], [16, 0.3], [20, 0.3], [24, 0.3], [28, 0.3], [32, 0.3], [36, 0.3], [40, 0.3], [44, 0.3], [48, 0.8]];
-const SHAKE = [[0, 18], [1, 10], [2, 34], [12, 46], [14, 16], [48, 22]];
-const KICKS = (b) => (b < 8 || (b >= 12 && b < 52));
+const FLASH = [[0, 0.7], [2, 0.9], [12, 1], [14, 0.35], ...TL.clips.map((c) => [c.beat, 0.3]), [SEC.basemaps, 0.3], [SEC.ecosystem, 0.3], [SEC.verify, 0.3], [SEC.end, 0.8]];
+const SHAKE = [[0, 18], [1, 10], [2, 34], [12, 46], [14, 16], [SEC.end, 22]];
+const KICKS = (b) => (b < 8 || (b >= 12 && b < SEC.end + 4));
 
 function globalFx(f) {
   let flash = 0;
@@ -251,23 +252,24 @@ function basemaps(f) {
 const TOOLS = ['ArcGIS', 'QGIS', 'Power BI', 'Tableau', 'GeoPandas', 'Kepler.gl', 'PostGIS', 'GeoParquet'];
 function ecosystem(f) {
   const beat = f / FPB;
-  const k = clamp(Math.floor(beat - 40), 0, 3);
+  const E = SEC.ecosystem;
+  const k = clamp(Math.floor(beat - E), 0, 3);
   const words = ['ARCGIS.', 'QGIS.', 'POWER BI.', 'TABLEAU.'];
-  let h = bigText(words[k], { y: 300, size: 190, cls: k % 2 ? 'red' : 'white', st: slam(f, 40 + k, { from: 1.9, dur: 4 }) });
+  let h = bigText(words[k], { y: 300, size: 190, cls: k % 2 ? 'red' : 'white', st: slam(f, E + k, { from: 1.9, dur: 4 }) });
   const cx = 540, cy = 1080, R = 360;
   let lines = '';
   let tools = '';
   TOOLS.forEach((t, i) => {
     const ang = -Math.PI / 2 + (i / TOOLS.length) * Math.PI * 2;
     const x = cx + Math.cos(ang) * R * 0.98, y = cy + Math.sin(ang) * R;
-    const appear = clamp((f - fr(40) - i * 1.5) / 5);
+    const appear = clamp((f - fr(E) - i * 1.5) / 5);
     const hot = i === k, lit = i < k || i >= 4;
     const pk = ((f / 18 + i * 0.37) % 1);
     lines += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${hot ? '#FF3621' : '#2C4A55'}" stroke-width="${hot ? 5 : 3}" opacity="${appear}"/>
       <circle cx="${lerp(cx, x, pk)}" cy="${lerp(cy, y, pk)}" r="${hot ? 9 : 6}" fill="${hot ? '#FF3621' : '#8CC4CF'}" opacity="${appear}"/>`;
     tools += `<div class="tool ${hot ? 'hot' : lit ? 'lit' : ''}" style="left:${x}px;top:${y}px;opacity:${appear};transform:translate(-50%,-50%) scale(${hot ? 1.12 : 1})">${t}</div>`;
   });
-  const hub = slam(f, 40, { from: 1.6, dur: 6 });
+  const hub = slam(f, E, { from: 1.6, dur: 6 });
   h += `<svg class="abs" style="left:0;top:0" width="1080" height="1920">${lines}
     <g style="transform-origin:${cx}px ${cy}px;${tf(hub)}"><path d="M${cx} ${cy - 210} L${cx + 182} ${cy - 105} L${cx + 182} ${cy + 105} L${cx} ${cy + 210} L${cx - 182} ${cy + 105} L${cx - 182} ${cy - 105}Z" fill="#13222E" stroke="#FF3621" stroke-width="5"/></g></svg>`;
   h += `<div class="abs" style="left:0;right:0;top:${cy - 70}px;text-align:center;${tf(hub)}">
@@ -278,11 +280,12 @@ function ecosystem(f) {
 }
 
 const QUERIES = ['00_transform_32616', '01_st_point', '02_area', '03_buffer', '04_join', '05_nearest', '06_dwithin', '07_overlay', '08_simplify',
-  '09_h3_agg', '10_kring', '11_formats_point', '11b_formats_polygon', '12_gold_select', '13_kepler', '14_bi_view_select', '15_genie', '16_bi_hex_centers'];
+  '09_h3_agg', '10_kring', '11_formats_point', '11b_formats_polygon', '12_gold_select', '13_kepler', '14_bi_view_select', '15_genie', '16_bi_hex_centers', '17_h3_fill'];
 function verify(f) {
-  let h = bigText('TESTED ON A', { y: 260, size: 150, cls: 'white', st: slam(f, 44, { from: 1.9, dur: 4 }) });
-  h += bigText('REAL WAREHOUSE.', { y: 400, size: 150, cls: 'red', st: slam(f, 44.5, { from: 1.9, dur: 4 }) });
-  const n = clamp(Math.floor((f - fr(44.5)) / 2.6), 0, QUERIES.length);
+  const V = SEC.verify;
+  let h = bigText('TESTED ON A', { y: 260, size: 150, cls: 'white', st: slam(f, V, { from: 1.9, dur: 4 }) });
+  h += bigText('REAL WAREHOUSE.', { y: 400, size: 150, cls: 'red', st: slam(f, V + 0.5, { from: 1.9, dur: 4 }) });
+  const n = clamp(Math.floor((f - fr(V + 0.5)) / 2.4), 0, QUERIES.length);
   const rows = QUERIES.slice(0, n)
     .slice(-14)
     .map((q) => `<div><span class="ok">✓</span> ${q.padEnd(22, ' ').replace(/ /g, '&nbsp;')}<span class="ok">SUCCEEDED</span></div>`)
@@ -295,20 +298,21 @@ function verify(f) {
 }
 
 function endCard(f) {
+  const B = SEC.end;
   let h = '';
-  const logo = slam(f, 48, { from: 3, dur: 6 });
+  const logo = slam(f, B + 0.0, { from: 3, dur: 6 });
   if (logo)
     h += `<svg class="abs" style="left:420px;top:300px;${tf(logo)}" width="240" height="240" viewBox="0 0 32 32">
       <path d="M16 3 28 10v12L16 29 4 22V10z" fill="none" stroke="#fff" stroke-width="2.2"/><circle cx="16" cy="16" r="3.6" fill="#FF3621"/></svg>`;
-  h += bigText('SPATIAL SQL', { y: 700, size: 200, cls: 'white', st: slam(f, 48.5, { from: 2, dur: 5 }) });
-  h += bigText('ON DATABRICKS', { y: 860, size: 132, cls: 'red', st: slam(f, 48.75, { from: 2, dur: 5 }) });
-  const sub = slam(f, 49.5, { from: 1, dur: 6, rise: 30 });
-  h += `<div class="abs" style="left:0;right:0;top:960px;text-align:center;font-size:46px;font-weight:600;${tf(sub)}">An interactive field guide in 12 steps</div>`;
-  const url = slam(f, 50.5, { from: 1.6, dur: 5 });
+  h += bigText('SPATIAL SQL', { y: 700, size: 200, cls: 'white', st: slam(f, B + 0.5, { from: 2, dur: 5 }) });
+  h += bigText('ON DATABRICKS', { y: 860, size: 132, cls: 'red', st: slam(f, B + 0.75, { from: 2, dur: 5 }) });
+  const sub = slam(f, B + 1.5, { from: 1, dur: 6, rise: 30 });
+  h += `<div class="abs" style="left:0;right:0;top:960px;text-align:center;font-size:46px;font-weight:600;${tf(sub)}">An interactive field guide in 13 steps</div>`;
+  const url = slam(f, B + 2.5, { from: 1.6, dur: 5 });
   h += `<div class="pill" style="left:50%;top:1080px;background:#FF3621;color:#13222E;font-size:62px;transform:translateX(-50%) scale(${url?.s ?? 1});opacity:${url?.o ?? 0}">ashrafosman.github.io/dbxgis</div>`;
-  const free = slam(f, 51.5, { from: 1, dur: 6, rise: 24 });
+  const free = slam(f, B + 3.5, { from: 1, dur: 6, rise: 24 });
   h += `<div class="abs teal" style="left:0;right:0;top:1230px;text-align:center;font-size:40px;font-weight:600;${tf(free)}">Free · no sign-up · runs in your browser</div>`;
-  const by = slam(f, 52.5, { from: 1, dur: 8, rise: 20 });
+  const by = slam(f, B + 4.5, { from: 1, dur: 8, rise: 20 });
   h += `<div class="abs" style="left:0;right:0;top:1520px;text-align:center;${tf(by)}">
       <div style="font-size:38px;font-weight:700">Ashraf Osman, PhD</div>
       <div style="font-size:30px;color:#8CC4CF;margin-top:6px">linkedin.com/in/ashraf-osman-phd</div>
@@ -318,7 +322,7 @@ function endCard(f) {
 }
 
 const SECTIONS = [
-  [0, hook], [4, formats], [8, question], [12, drop], [16, clips], [36, basemaps], [40, ecosystem], [44, verify], [48, endCard],
+  [0, hook], [4, formats], [8, question], [12, drop], [16, clips], [SEC.basemaps, basemaps], [SEC.ecosystem, ecosystem], [SEC.verify, verify], [SEC.end, endCard],
 ];
 
 window.renderFrame = async (f) => {
